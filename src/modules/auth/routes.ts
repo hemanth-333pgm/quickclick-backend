@@ -1,21 +1,30 @@
 ﻿import { Router } from "express";
+import { AuthController } from "./controllers/auth.controller";
+import { validate } from "../../middleware/validate.middleware";
+import { authValidation } from "./validators/auth.validator";
 
 const router = Router();
+const authController = new AuthController();
 
-router.post("/send-otp", (req, res) => {
-    res.json({ message: "OTP sent" });
-});
+// Public routes
+router.post(
+    "/send-otp",
+    authController.sendOTP
+);
 
-router.post("/verify-otp", (req, res) => {
-    res.json({ message: "OTP verified", accessToken: "mock-token" });
-});
+router.post(
+    "/verify-otp",
+    authController.verifyOTP
+);
 
-router.post("/logout", (req, res) => {
-    res.json({ message: "Logged out" });
-});
+router.post(
+    "/refresh",
+    authController.refreshToken
+);
 
-router.post("/refresh", (req, res) => {
-    res.json({ message: "Token refreshed" });
-});
+router.post(
+    "/logout",
+    authController.logout
+);
 
 export default router;

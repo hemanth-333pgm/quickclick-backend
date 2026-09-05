@@ -24,10 +24,18 @@ export class TokenService {
     }
 
     verifyAccessToken(token: string): any {
-        return jwt.verify(token, config.jwt.accessSecret);
+        try {
+            return jwt.verify(token, config.jwt.accessSecret);
+        } catch (error) {
+            throw new Error("Invalid or expired token");
+        }
     }
 
     verifyRefreshToken(token: string): any {
-        return jwt.verify(token, config.jwt.refreshSecret);
+        try {
+            return jwt.verify(token, config.jwt.refreshSecret);
+        } catch (error) {
+            throw new Error("Invalid or expired refresh token");
+        }
     }
 }

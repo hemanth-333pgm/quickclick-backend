@@ -35,7 +35,10 @@ export class AuthService {
         refreshToken: string;
         user: any;
     }> {
+        // Verify OTP
         await this.authRepository.verifyOTP(mobile, purpose, otp);
+        
+        // Find or create user
         const user = await this.authRepository.findOrCreateCustomer(mobile);
         await this.authRepository.validateUserStatus(user);
         await this.authRepository.updateLastLogin(user._id.toString());
@@ -44,6 +47,7 @@ export class AuthService {
         const accessToken = this.tokenService.generateAccessToken(user);
         const refreshToken = this.tokenService.generateRefreshToken(user);
 
+        // Register device if token provided
         if (deviceToken) {
             await this.userService.registerDevice(user._id.toString(), deviceToken);
         }
@@ -75,7 +79,8 @@ export class AuthService {
     }
 
     async logout(accessToken: string): Promise<void> {
-        // Token blacklisting logic
+        // Token blacklisting logic can be added here
+        logger.info(`User logged out`);
     }
 
     private generateOTP(): string {

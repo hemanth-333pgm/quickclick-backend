@@ -1,95 +1,97 @@
-﻿import { AuthRepository } from "../repositories/auth.repository";
-import { UserService } from "../../users/services/user.service";
-import { TokenService } from "./token.service";
-import { config } from "../../../config/env";
-import { logger } from "../../../config/logger";
+﻿import { OTP } from "../models/otp.model";
+import { User } from "../../users/models/user.model";
+import { UserStatus } from "../../../common/constants/status.constants";
 import { AppError } from "../../../common/errors/app-error";
 import { ErrorCodes } from "../../../common/constants/error-codes.constants";
 import * as bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 
 export class AuthService {
-    private authRepository: AuthRepository;
-    private userService: UserService;
-    private tokenService: TokenService;
+    async sendOTP(mobile: string, purpose: string = "LOGIN"): Promise<any> {
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const otpHash = await bcrypt.hash(otp, 10);
+        const expiresAt = new Date();
+        expiresAt.setMinutes(expiresAt.getMinutes() + 5);
 
-    constructor() {
-        this.authRepository = new AuthRepository();
-        this.userService = new UserService();
-        this.tokenService = new TokenService();
+        // Delete old OTPs for this mobile
+        await OTP.deleteMany({ mobile, verifiedAt: { $exists: false } });
+
+        const otpRecord = await OTP.create({
+            mobile,
+            purpose,
+            otpHash,
+            expiresAt,
+            attempts: 0,
+        });
+
+        console.log(`📱 OTP for ${mobile}: ${otp}`); // Log for testing
+        return { challengeId: otpRecord._id };
     }
 
-    async sendOTP(mobile: string, purpose: string = "LOGIN"): Promise<{ challengeId: string }> {
-        const otp = this.generateOTP();
-        logger.info(`OTP generated for ${mobile}: ${otp}`);
-        const otpRecord = await this.authRepository.createOTP(mobile, purpose, otp);
-        return { challengeId: otpRecord._id.toString() };
-    }
+    async verifyOTP(mobile: string, otp: string): Promise<any> {
+        const otpRecord = await OTP.findOne({
+            mobile,
+            verifiedAt: { $exists: false }
+        }).sort({ createdAt: -1 });
 
-    async verifyOTP(
-        mobile: string,
-        otp: string,
-        purpose: string = "LOGIN",
-        deviceToken?: string
-    ): Promise<{
-        accessToken: string;
-        refreshToken: string;
-        user: any;
-    }> {
-        // Verify OTP
-        await this.authRepository.verifyOTP(mobile, purpose, otp);
-        
-        // Find or create user
-        const user = await this.authRepository.findOrCreateCustomer(mobile);
-        await this.authRepository.validateUserStatus(user);
-        await this.authRepository.updateLastLogin(user._id.toString());
-
-        // Generate REAL JWT tokens
-        const accessToken = this.tokenService.generateAccessToken(user);
-        const refreshToken = this.tokenService.generateRefreshToken(user);
-
-        // Register device if token provided
-        if (deviceToken) {
-            await this.userService.registerDevice(user._id.toString(), deviceToken);
+        if (!otpRecord) {
+            throw new Error("OTP not found or expired");
         }
 
-        const userData = this.userService.sanitizeUser(user);
+        if (new Date() > otpRecord.expiresAt) {
+            throw new Error("OTP has expired");
+        }
+
+        if (otpRecord.attempts >= 5) {
+            throw new Error("Too many attempts");
+        }
+
+        const isValid = await bcrypt.compare(otp, otpRecord.otpHash);
+        if (!isValid) {
+            otpRecord.attempts += 1;
+            await otpRecord.save();
+            throw new Error("Invalid OTP");
+        }
+
+        otpRecord.verifiedAt = new Date();
+        await otpRecord.save();
+
+        // Find or create user
+        let user = await User.findOne({ mobile });
+        if (!user) {
+            user = await User.create({
+                name: `Customer ${mobile.slice(-4)}`,
+                mobile,
+                role: "CUSTOMER",
+                status: UserStatus.ACTIVE,
+            });
+        }
+
+        // Generate JWT token
+        const accessSecret = process.env.JWT_ACCESS_SECRET || "your-super-secret-access-key-min-32-characters";
+        const refreshSecret = process.env.JWT_REFRESH_SECRET || "your-super-secret-refresh-key-min-32-characters";
+
+        const accessToken = jwt.sign(
+            { id: user._id, mobile: user.mobile, role: user.role },
+            accessSecret,
+            { expiresIn: "15m" }
+        );
+
+        const refreshToken = jwt.sign(
+            { id: user._id, mobile: user.mobile },
+            refreshSecret,
+            { expiresIn: "30d" }
+        );
 
         return {
             accessToken,
             refreshToken,
-            user: userData,
+            user: {
+                id: user._id,
+                name: user.name,
+                mobile: user.mobile,
+                role: user.role,
+            },
         };
-    }
-
-    async refreshToken(refreshToken: string): Promise<{
-        accessToken: string;
-        refreshToken: string;
-    }> {
-        const payload = this.tokenService.verifyRefreshToken(refreshToken);
-        const user = await this.authRepository.findUserByMobile(payload.mobile);
-        if (!user) {
-            throw new AppError("User not found", 404, ErrorCodes.RESOURCE_NOT_FOUND);
-        }
-        const newAccessToken = this.tokenService.generateAccessToken(user);
-        const newRefreshToken = this.tokenService.generateRefreshToken(user);
-        return {
-            accessToken: newAccessToken,
-            refreshToken: newRefreshToken,
-        };
-    }
-
-    async logout(accessToken: string): Promise<void> {
-        // Token blacklisting logic can be added here
-        logger.info(`User logged out`);
-    }
-
-    private generateOTP(): string {
-        const length = config.otp.length || 6;
-        const digits = "0123456789";
-        let otp = "";
-        for (let i = 0; i < length; i++) {
-            otp += digits[Math.floor(Math.random() * 10)];
-        }
-        return otp;
     }
 }

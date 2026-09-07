@@ -1,0 +1,61 @@
+﻿// Add to existing DeliveryPartnerSchema
+{
+    // ... existing fields
+    
+    // KYC Fields
+    aadhaarVerified: {
+        type: Boolean,
+        default: false,
+    },
+    aadhaarNumber: {
+        type: String,
+        select: false,
+    },
+    panVerified: {
+        type: Boolean,
+        default: false,
+    },
+    panNumber: {
+        type: String,
+        select: false,
+    },
+    drivingLicenseVerified: {
+        type: Boolean,
+        default: false,
+    },
+    drivingLicenseNumber: {
+        type: String,
+        select: false,
+    },
+    vehicleRegistrationVerified: {
+        type: Boolean,
+        default: false,
+    },
+    vehicleRegistrationNumber: {
+        type: String,
+        select: false,
+    },
+    insuranceVerified: {
+        type: Boolean,
+        default: false,
+    },
+    policeVerificationStatus: {
+        type: String,
+        enum: ["PENDING", "IN_PROGRESS", "CLEARED", "REJECTED"],
+        default: "PENDING",
+    },
+    backgroundCheckStatus: {
+        type: String,
+        enum: ["PENDING", "IN_PROGRESS", "CLEARED", "REJECTED"],
+        default: "PENDING",
+    },
+    kycStatus: {
+        type: String,
+        enum: ["PENDING", "IN_PROGRESS", "VERIFIED", "REJECTED"],
+        default: "PENDING",
+    },
+    kycSubmittedAt: Date,
+    kycVerifiedAt: Date,
+    kycRejectedAt: Date,
+    kycRejectionReason: String,
+}

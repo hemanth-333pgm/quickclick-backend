@@ -1,0 +1,40 @@
+﻿// Add these BEFORE the API routes (at the top of server.ts)
+
+// Health Check - Root level
+app.get("/health", (req, res) => {
+    const dbStatus = mongoose.connection.readyState === 1 ? "connected" : "disconnected";
+    res.json({
+        status: "OK",
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV || "development",
+        uptime: process.uptime(),
+        database: dbStatus,
+        mongodb_uri: process.env.MONGODB_URI ? "configured" : "not configured"
+    });
+});
+
+// Database Health - Root level
+app.get("/health/db", (req, res) => {
+    const states = {
+        0: "disconnected",
+        1: "connected",
+        2: "connecting",
+        3: "disconnecting"
+    };
+    res.json({
+        status: states[mongoose.connection.readyState as keyof typeof states] || "unknown",
+        readyState: mongoose.connection.readyState,
+        database: mongoose.connection.name || "quickclick",
+        host: mongoose.connection.host || "localhost",
+        port: mongoose.connection.port || 27017
+    });
+});
+
+// API Ping - Root level
+app.get("/api/v1/ping", (req, res) => {
+    res.json({
+        message: "pong",
+        timestamp: new Date().toISOString(),
+        database: mongoose.connection.readyState === 1 ? "connected" : "disconnected"
+    });
+});

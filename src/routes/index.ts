@@ -22,18 +22,22 @@ import couponRoutes from "../modules/coupons/routes";
 
 const router = Router();
 
+// Public routes
 router.use("/auth", authRoutes);
-router.use("/users", userRoutes);
-router.use("/addresses", addressRoutes);
 router.use("/products", productRoutes);
 router.use("/categories", categoryRoutes);
+router.use("/retailers", retailerRoutes);
+router.use("/location", locationRoutes);
+router.use("/zones", zoneRoutes);
+router.use("/coupons", couponRoutes);
+
+// Protected routes (auth required)
+router.use("/users", userRoutes);
+router.use("/addresses", addressRoutes);
 router.use("/cart", cartRoutes);
 router.use("/orders", orderRoutes);
-router.use("/retailers", retailerRoutes);
 router.use("/delivery", deliveryRoutes);
 router.use("/admin", adminRoutes);
-router.use("/zones", zoneRoutes);
-router.use("/location", locationRoutes);
 router.use("/map", mapRoutes);
 router.use("/payments", paymentRoutes);
 router.use("/kyc", kycRoutes);
@@ -41,6 +45,5 @@ router.use("/wishlist", wishlistRoutes);
 router.use("/notifications", notificationRoutes);
 router.use("/verification", verificationRoutes);
 router.use("/reports", reportRoutes);
-router.use("/coupons", couponRoutes);
 
 export default router;

@@ -3,24 +3,51 @@ import { authMiddleware } from "../../middleware/auth.middleware";
 
 const router = Router();
 
-router.get("/", authMiddleware, (req, res) => {
-    res.json({ message: "Cart retrieved", data: { items: [], subtotal: 0 } });
+// All routes require authentication
+router.use(authMiddleware);
+
+router.get("/", (req, res) => {
+    res.json({
+        success: true,
+        message: "Cart retrieved",
+        data: {
+            items: [],
+            subtotal: 0,
+            deliveryFee: 0,
+            total: 0
+        }
+    });
 });
 
-router.post("/items", authMiddleware, (req, res) => {
-    res.json({ message: "Item added to cart", data: req.body });
+router.post("/items", (req, res) => {
+    res.json({
+        success: true,
+        message: "Item added to cart",
+        data: req.body
+    });
 });
 
-router.patch("/items/:itemId", authMiddleware, (req, res) => {
-    res.json({ message: "Item updated", data: req.body });
+router.patch("/items/:itemId", (req, res) => {
+    res.json({
+        success: true,
+        message: "Item updated",
+        data: { itemId: req.params.itemId, ...req.body }
+    });
 });
 
-router.delete("/items/:itemId", authMiddleware, (req, res) => {
-    res.json({ message: "Item removed" });
+router.delete("/items/:itemId", (req, res) => {
+    res.json({
+        success: true,
+        message: "Item removed",
+        data: { itemId: req.params.itemId }
+    });
 });
 
-router.delete("/", authMiddleware, (req, res) => {
-    res.json({ message: "Cart cleared" });
+router.delete("/", (req, res) => {
+    res.json({
+        success: true,
+        message: "Cart cleared"
+    });
 });
 
 export default router;

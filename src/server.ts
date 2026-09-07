@@ -1,18 +1,43 @@
-﻿import express from "express";
+﻿import express, { Application } from "express";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
 import morgan from "morgan";
-import routes from "./routes";
+import { createServer } from "http";
 
 // Load environment variables
 dotenv.config();
 
-const app = express();
+// Import routes
+import authRoutes from "./modules/auth/routes";
+import userRoutes from "./modules/users/routes";
+import retailerRoutes from "./modules/retailers/routes";
+import productRoutes from "./modules/products/routes";
+import orderRoutes from "./modules/orders/routes";
+import deliveryRoutes from "./modules/delivery/routes";
+import adminRoutes from "./modules/admin/routes";
+import locationRoutes from "./modules/location/routes/location.routes";
+import zoneRoutes from "./modules/zones/routes/zone.routes";
+import notificationRoutes from "./modules/notifications/routes";
+import verificationRoutes from "./modules/verification/routes/verification.routes";
+
+// Import middleware
+import { errorHandler } from "./middleware/error.middleware";
+import { HealthController } from "./controllers/health.controller";
+
+// Import WebSocket
+import { WebSocketService } from "./integrations/websocket/websocket.service";
+
+const app: Application = express();
+const server = createServer(app);
 const PORT = process.env.PORT || 5000;
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/quickclick";
+const API_PREFIX = process.env.API_PREFIX || "/api/v1";
+
+// Initialize WebSocket
+const webSocketService = new WebSocketService(server);
 
 // Middleware
 app.use(helmet());
@@ -25,49 +50,23 @@ app.use(morgan("combined"));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-// Health check
-app.get("/health", (req, res) => {
-    const dbStatus = mongoose.connection.readyState === 1 ? "connected" : "disconnected";
-    res.json({
-        status: "OK",
-        timestamp: new Date().toISOString(),
-        environment: process.env.NODE_ENV || "development",
-        uptime: process.uptime(),
-        database: dbStatus,
-        mongodb_uri: MONGODB_URI ? "configured" : "not configured"
-    });
-});
+// Health Check
+app.get("/health", HealthController.getHealthStatus);
 
-// Database status
-app.get("/health/db", (req, res) => {
-    const states = {
-        0: "disconnected",
-        1: "connected",
-        2: "connecting",
-        3: "disconnecting"
-    };
-    res.json({
-        status: states[mongoose.connection.readyState as keyof typeof states] || "unknown",
-        readyState: mongoose.connection.readyState,
-        database: mongoose.connection.name || "quickclick",
-        host: mongoose.connection.host || "localhost",
-        port: mongoose.connection.port || 27017
-    });
-});
+// API Routes
+app.use(`${API_PREFIX}/auth`, authRoutes);
+app.use(`${API_PREFIX}/users`, userRoutes);
+app.use(`${API_PREFIX}/retailers`, retailerRoutes);
+app.use(`${API_PREFIX}/products`, productRoutes);
+app.use(`${API_PREFIX}/orders`, orderRoutes);
+app.use(`${API_PREFIX}/delivery`, deliveryRoutes);
+app.use(`${API_PREFIX}/admin`, adminRoutes);
+app.use(`${API_PREFIX}/location`, locationRoutes);
+app.use(`${API_PREFIX}/zones`, zoneRoutes);
+app.use(`${API_PREFIX}/notifications`, notificationRoutes);
+app.use(`${API_PREFIX}/verification`, verificationRoutes);
 
-// API routes
-app.get("/api/v1/ping", (req, res) => {
-    res.json({ 
-        message: "pong", 
-        timestamp: new Date().toISOString(),
-        database: mongoose.connection.readyState === 1 ? "connected" : "disconnected"
-    });
-});
-
-// Mount all routes
-app.use("/api/v1", routes);
-
-// 404 handler
+// 404 Handler
 app.use((req, res) => {
     res.status(404).json({
         success: false,
@@ -78,104 +77,61 @@ app.use((req, res) => {
     });
 });
 
-// Error handler
-app.use((err: any, req: any, res: any, next: any) => {
-    console.error("❌ Error:", err.message);
-    res.status(500).json({
-        success: false,
-        error: {
-            code: "INTERNAL_ERROR",
-            message: err.message || "Internal Server Error"
-        }
-    });
-});
+// Error Handler
+app.use(errorHandler);
 
-// Connect to MongoDB with better error handling
-const connectWithRetry = async (retries: number = 5, delay: number = 2000) => {
-    let attempt = 0;
-    while (attempt < retries) {
-        try {
-            console.log(`📡 Attempting to connect to MongoDB (attempt ${attempt + 1}/${retries})...`);
-            console.log(`📍 URI: ${MONGODB_URI}`);
-            
-            await mongoose.connect(MONGODB_URI, {
-                serverSelectionTimeoutMS: 5000,
-                connectTimeoutMS: 5000,
-                socketTimeoutMS: 45000,
-            });
-            
-            console.log("✅ MongoDB connected successfully!");
-            console.log(`📊 Database: ${mongoose.connection.name}`);
-            console.log(`📍 Host: ${mongoose.connection.host}:${mongoose.connection.port}`);
-            return true;
-        } catch (error) {
-            attempt++;
-            console.error(`❌ Connection attempt ${attempt} failed:`, error instanceof Error ? error.message : error);
-            
-            if (attempt < retries) {
-                console.log(`⏳ Retrying in ${delay/1000} seconds...`);
-                await new Promise(resolve => setTimeout(resolve, delay));
-            }
-        }
-    }
-    return false;
-};
-
-// Start server
+// Start Server
 const startServer = async () => {
-    // Try to connect to MongoDB with retries
-    const connected = await connectWithRetry(5, 2000);
-    
-    if (!connected) {
-        console.log("⚠️ Could not connect to MongoDB after multiple attempts. Running without database.");
-        console.log("💡 To fix MongoDB connection:");
-        console.log("   1. Check if MongoDB is running: netstat -ano | findstr :27017");
-        console.log("   2. Start MongoDB: C:\\Program Files\\MongoDB\\Server\\8.3\\bin\\mongod.exe --dbpath C:\\data\\db");
-        console.log("   3. Check .env file has correct MONGODB_URI");
-    }
+    try {
+        await mongoose.connect(MONGODB_URI);
+        console.log("✅ MongoDB connected successfully");
+        console.log(`📊 Database: ${mongoose.connection.name}`);
+        console.log(`📍 Host: ${mongoose.connection.host}`);
 
-    app.listen(PORT, () => {
-        const dbStatus = mongoose.connection.readyState === 1 ? "✅ Connected" : "⚠️ Disconnected";
-        console.log(`
+        server.listen(PORT, () => {
+            console.log(`
 ╔══════════════════════════════════════════════════════════════════════════╗
 ║  🚀 QUICKCLICK BACKEND SERVER                                         ║
 ║  📡 Environment: ${process.env.NODE_ENV || "development"}                         ║
 ║  🌐 URL: http://localhost:${PORT}                                      ║
-║  🗄️  Database: ${dbStatus}                                               ║
+║  🔌 WebSocket: ws://localhost:${PORT}/socket.io                        ║
+║  🗄️  Database: ✅ Connected                                          ║
 ║  📚 Health: http://localhost:${PORT}/health                            ║
-║  📊 DB Status: http://localhost:${PORT}/health/db                      ║
 ║                                                                        ║
 ║  📦 API Endpoints:                                                     ║
-║  👤 Auth: /api/v1/auth                                               ║
-║  👤 Users: /api/v1/users                                             ║
-║  🏪 Retailers: /api/v1/retailers                                     ║
-║  📦 Products: /api/v1/products                                       ║
-║  📋 Orders: /api/v1/orders                                           ║
-║  🚚 Delivery: /api/v1/delivery                                       ║
-║  👑 Admin: /api/v1/admin                                             ║
-║  🗺️  Location: /api/v1/location                                      ║
+║  👤 Auth: ${API_PREFIX}/auth                                         ║
+║  👤 Users: ${API_PREFIX}/users                                       ║
+║  🏪 Retailers: ${API_PREFIX}/retailers                               ║
+║  📦 Products: ${API_PREFIX}/products                                 ║
+║  📋 Orders: ${API_PREFIX}/orders                                     ║
+║  🚚 Delivery: ${API_PREFIX}/delivery                                 ║
+║  👑 Admin: ${API_PREFIX}/admin                                       ║
+║  🗺️  Location: ${API_PREFIX}/location                                ║
+║  🌍 Zones: ${API_PREFIX}/zones                                       ║
+║  🔔 Notifications: ${API_PREFIX}/notifications                       ║
+║  ✅ Verification: ${API_PREFIX}/verification                         ║
 ╚══════════════════════════════════════════════════════════════════════════╝
-        `);
-    });
+            `);
+        });
+    } catch (error) {
+        console.error("❌ Failed to start server:", error);
+        process.exit(1);
+    }
 };
 
 startServer();
 
-// Graceful shutdown
+// Graceful Shutdown
 process.on("SIGINT", async () => {
     console.log("\n🔄 Shutting down gracefully...");
-    if (mongoose.connection.readyState === 1) {
-        await mongoose.disconnect();
-        console.log("✅ MongoDB disconnected");
-    }
+    await mongoose.disconnect();
+    console.log("✅ MongoDB disconnected");
     process.exit(0);
 });
 
 process.on("SIGTERM", async () => {
     console.log("\n🔄 Shutting down gracefully...");
-    if (mongoose.connection.readyState === 1) {
-        await mongoose.disconnect();
-        console.log("✅ MongoDB disconnected");
-    }
+    await mongoose.disconnect();
+    console.log("✅ MongoDB disconnected");
     process.exit(0);
 });

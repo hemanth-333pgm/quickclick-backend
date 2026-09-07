@@ -9,7 +9,7 @@ export class TokenService {
             role: user.role,
         };
         return jwt.sign(payload, config.jwt.accessSecret, {
-            expiresIn: config.jwt.accessExpiresIn,
+            expiresIn: config.jwt.accessExpiresIn as any,
         });
     }
 
@@ -19,7 +19,7 @@ export class TokenService {
             mobile: user.mobile,
         };
         return jwt.sign(payload, config.jwt.refreshSecret, {
-            expiresIn: config.jwt.refreshExpiresIn,
+            expiresIn: config.jwt.refreshExpiresIn as any,
         });
     }
 

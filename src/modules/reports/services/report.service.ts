@@ -3,6 +3,7 @@ import { User } from "../../users/models/user.model";
 import { Retailer } from "../../retailers/models/retailer.model";
 import { DeliveryPartner } from "../../delivery/models/delivery-partner.model";
 import { Product } from "../../products/models/product.model";
+import { DeliveryAssignment } from "../../delivery/models/delivery-assignment.model";
 import { logger } from "../../../config/logger";
 
 export class ReportService {
@@ -27,20 +28,21 @@ export class ReportService {
             dailyData[day].revenue += order.total;
         }
 
-        // Top products
+        // Top products - Fix: Convert ObjectId to string
         const productMap: any = {};
         for (const order of orders) {
             for (const item of order.items) {
-                if (!productMap[item.productId]) {
-                    productMap[item.productId] = {
+                const productId = item.productId.toString();
+                if (!productMap[productId]) {
+                    productMap[productId] = {
                         productId: item.productId,
                         name: item.name,
                         quantity: 0,
                         revenue: 0,
                     };
                 }
-                productMap[item.productId].quantity += item.quantity;
-                productMap[item.productId].revenue += item.total;
+                productMap[productId].quantity += item.quantity;
+                productMap[productId].revenue += item.total;
             }
         }
         const topProducts = Object.values(productMap)
@@ -81,12 +83,14 @@ export class ReportService {
             statusBreakdown[order.status] = (statusBreakdown[order.status] || 0) + 1;
         }
 
-        // Average delivery time
+        // Average delivery time - Fix: Use order fields
         let totalDeliveryTime = 0;
         let deliveredOrders = 0;
         for (const order of orders) {
-            if (order.status === "DELIVERED" && order.deliveredAt && order.createdAt) {
-                totalDeliveryTime += (order.deliveredAt.getTime() - order.createdAt.getTime()) / 60000;
+            if (order.status === "DELIVERED" && order.updatedAt && order.createdAt) {
+                // Check if order has delivery time tracking
+                const deliveryTime = order.updatedAt.getTime() - order.createdAt.getTime();
+                totalDeliveryTime += deliveryTime / 60000;
                 deliveredOrders++;
             }
         }
@@ -173,38 +177,40 @@ export class ReportService {
         const completedOrders = orders.filter(o => o.status === "DELIVERED").length;
         const cancelledOrders = orders.filter(o => o.status === "CANCELLED").length;
 
-        // Most ordered products
+        // Most ordered products - Fix: Convert ObjectId to string
         const productMap: any = {};
         for (const order of orders) {
             if (order.status !== "DELIVERED") continue;
             for (const item of order.items) {
-                if (!productMap[item.productId]) {
-                    productMap[item.productId] = {
+                const productId = item.productId.toString();
+                if (!productMap[productId]) {
+                    productMap[productId] = {
                         productId: item.productId,
                         name: item.name,
                         quantity: 0,
                     };
                 }
-                productMap[item.productId].quantity += item.quantity;
+                productMap[productId].quantity += item.quantity;
             }
         }
         const topProducts = Object.values(productMap)
             .sort((a: any, b: any) => b.quantity - a.quantity)
             .slice(0, 10);
 
-        // Preferred retailers
+        // Preferred retailers - Fix: Convert ObjectId to string
         const retailerMap: any = {};
         for (const order of orders) {
             if (order.status !== "DELIVERED") continue;
-            if (!retailerMap[order.retailerId]) {
-                retailerMap[order.retailerId] = {
+            const retailerId = order.retailerId.toString();
+            if (!retailerMap[retailerId]) {
+                retailerMap[retailerId] = {
                     retailerId: order.retailerId,
                     orders: 0,
                     spent: 0,
                 };
             }
-            retailerMap[order.retailerId].orders++;
-            retailerMap[order.retailerId].spent += order.total;
+            retailerMap[retailerId].orders++;
+            retailerMap[retailerId].spent += order.total;
         }
         const topRetailers = Object.values(retailerMap)
             .sort((a: any, b: any) => b.orders - a.orders)

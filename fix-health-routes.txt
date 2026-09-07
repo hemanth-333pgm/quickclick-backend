@@ -1,0 +1,33 @@
+﻿// Health Check - Root level (NO /api/v1 prefix)
+app.get("/health", (req, res) => {
+    res.json({
+        status: "OK",
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV || "development",
+        uptime: process.uptime(),
+        database: mongoose.connection.readyState === 1 ? "connected" : "disconnected"
+    });
+});
+
+// Database Health
+app.get("/health/db", (req, res) => {
+    const states = {
+        0: "disconnected",
+        1: "connected",
+        2: "connecting",
+        3: "disconnecting"
+    };
+    res.json({
+        status: states[mongoose.connection.readyState] || "unknown",
+        readyState: mongoose.connection.readyState,
+        database: mongoose.connection.name || "quickclick"
+    });
+});
+
+// API Ping
+app.get("/api/v1/ping", (req, res) => {
+    res.json({
+        message: "pong",
+        timestamp: new Date().toISOString()
+    });
+});

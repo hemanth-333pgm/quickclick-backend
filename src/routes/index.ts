@@ -19,10 +19,14 @@ import notificationRoutes from "../modules/notifications/routes";
 import verificationRoutes from "../modules/verification/routes/verification.routes";
 import reportRoutes from "../modules/reports/routes";
 import couponRoutes from "../modules/coupons/routes";
+import walletRoutes from "../modules/wallet/routes";
+import ratingRoutes from "../modules/ratings/routes";
 
 const router = Router();
 
-// Public routes
+// ============================================
+// PUBLIC ROUTES (No Auth Required)
+// ============================================
 router.use("/auth", authRoutes);
 router.use("/products", productRoutes);
 router.use("/categories", categoryRoutes);
@@ -31,7 +35,9 @@ router.use("/location", locationRoutes);
 router.use("/zones", zoneRoutes);
 router.use("/coupons", couponRoutes);
 
-// Protected routes (auth required)
+// ============================================
+// PROTECTED ROUTES (Auth Required)
+// ============================================
 router.use("/users", userRoutes);
 router.use("/addresses", addressRoutes);
 router.use("/cart", cartRoutes);
@@ -45,5 +51,7 @@ router.use("/wishlist", wishlistRoutes);
 router.use("/notifications", notificationRoutes);
 router.use("/verification", verificationRoutes);
 router.use("/reports", reportRoutes);
+router.use("/wallet", walletRoutes);
+router.use("/ratings", ratingRoutes);
 
 export default router;

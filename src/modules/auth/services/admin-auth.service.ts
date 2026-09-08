@@ -7,11 +7,21 @@ import { config } from "../../../config/env";
 
 export class AdminAuthService {
     async loginWithPassword(email: string, password: string): Promise<any> {
-        // Find user with password field
+        console.log("🔐 Admin login attempt for:", email);
+        
+        // Find user with password field - explicitly select password
         const user = await User.findOne({ 
             email: email.toLowerCase(),
             role: { $in: ["ADMIN", "SUPER_ADMIN"] }
-        }).select("+password");
+        }).select('+password');  // ✅ Explicitly select password field
+
+        console.log("📋 User found:", user ? "Yes" : "No");
+        if (user) {
+            console.log("   ID:", user._id);
+            console.log("   Role:", user.role);
+            console.log("   Has Password:", !!user.password);
+            console.log("   Password Hash:", user.password || "NOT SET");
+        }
 
         if (!user) {
             throw new AppError("Invalid email or password", 401, ErrorCodes.AUTH_UNAUTHORIZED);
@@ -24,10 +34,14 @@ export class AdminAuthService {
 
         // Verify password
         if (!user.password) {
+            console.log("❌ Password field is empty or null");
             throw new AppError("Password not set. Please use OTP login.", 400, ErrorCodes.AUTH_UNAUTHORIZED);
         }
 
+        console.log("🔐 Comparing password...");
         const isPasswordValid = await bcrypt.compare(password, user.password);
+        console.log("   Password match:", isPasswordValid ? "✅ Yes" : "❌ No");
+
         if (!isPasswordValid) {
             throw new AppError("Invalid email or password", 401, ErrorCodes.AUTH_UNAUTHORIZED);
         }
@@ -68,16 +82,13 @@ export class AdminAuthService {
         password: string;
         mobile?: string;
     }): Promise<any> {
-        // Check if user exists
         const existing = await User.findOne({ email: data.email.toLowerCase() });
         if (existing) {
             throw new AppError("User already exists", 409, ErrorCodes.USER_ALREADY_EXISTS);
         }
 
-        // Hash password
         const hashedPassword = await bcrypt.hash(data.password, 10);
-
-        // Create admin user
+        
         const user = await User.create({
             name: data.name,
             email: data.email.toLowerCase(),
@@ -100,12 +111,11 @@ export class AdminAuthService {
     }
 
     async changePassword(userId: string, oldPassword: string, newPassword: string): Promise<void> {
-        const user = await User.findById(userId).select("+password");
+        const user = await User.findById(userId).select('+password');
         if (!user) {
             throw new AppError("User not found", 404, ErrorCodes.USER_NOT_FOUND);
         }
 
-        // Verify old password
         if (user.password) {
             const isValid = await bcrypt.compare(oldPassword, user.password);
             if (!isValid) {
@@ -113,7 +123,6 @@ export class AdminAuthService {
             }
         }
 
-        // Hash new password
         user.password = await bcrypt.hash(newPassword, 10);
         await user.save();
     }

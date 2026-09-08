@@ -1,12 +1,10 @@
 ﻿import { Router } from "express";
 import { AuthController } from "./controllers/auth.controller";
-import { AdminAuthController } from "./controllers/admin-auth.controller";
 import { authMiddleware } from "../../middleware/auth.middleware";
 import { rbacMiddleware, Roles } from "../../middleware/rbac.middleware";
 
 const router = Router();
 const authController = new AuthController();
-const adminAuthController = new AdminAuthController();
 
 // ============================================
 // PUBLIC ROUTES
@@ -18,7 +16,7 @@ router.post("/verify-otp", authController.verifyOTP);
 router.post("/refresh", authController.refreshToken);
 
 // Admin Password Login
-router.post("/admin/login", adminAuthController.loginWithPassword);
+router.post("/admin/login", authController.adminLogin);
 
 // ============================================
 // PROTECTED ROUTES
@@ -31,15 +29,15 @@ router.post("/logout", authController.logout);
 router.post(
     "/admin/create",
     authMiddleware,
-    rbacMiddleware(Roles.SUPER_ADMIN),
-    adminAuthController.createAdmin
+    rbacMiddleware(["SUPER_ADMIN"]),
+    authController.createAdmin
 );
 
 // Change Password (Any authenticated user)
 router.post(
     "/change-password",
     authMiddleware,
-    adminAuthController.changePassword
+    authController.changePassword
 );
 
 export default router;

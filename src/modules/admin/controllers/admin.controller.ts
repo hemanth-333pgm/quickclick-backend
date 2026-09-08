@@ -1,4 +1,5 @@
-﻿import { Request, Response, NextFunction } from "express";
+﻿import mongoose from 'mongoose';
+import { Request, Response, NextFunction } from "express";
 import { AdminDashboardService } from "../services/admin-dashboard.service";
 import { User } from "../../users/models/user.model";
 import { Retailer } from "../../retailers/models/retailer.model";
@@ -365,7 +366,7 @@ export class AdminController {
             order.statusHistory.push({
                 fromStatus: "READY_FOR_PICKUP",
                 toStatus: "ASSIGNED",
-                actorId: req.userId,
+                actorId: new mongoose.Types.ObjectId(req.userId),
                 actorRole: "ADMIN",
                 reason: `Assigned to delivery partner ${deliveryPartnerId}`,
                 timestamp: new Date()
@@ -378,3 +379,4 @@ export class AdminController {
         }
     };
 }
+

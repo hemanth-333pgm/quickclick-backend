@@ -9,36 +9,28 @@ export class AdminAuthService {
     async loginWithPassword(email: string, password: string): Promise<any> {
         console.log("🔐 Admin login attempt for:", email);
         
-        // Find user with password field - explicitly select password
         const user = await User.findOne({ 
             email: email.toLowerCase(),
             role: { $in: ["ADMIN", "SUPER_ADMIN"] }
-        }).select('+password');  // ✅ Explicitly select password field
+        }).select('+password');
 
         console.log("📋 User found:", user ? "Yes" : "No");
         if (user) {
-            console.log("   ID:", user._id);
-            console.log("   Role:", user.role);
             console.log("   Has Password:", !!user.password);
-            console.log("   Password Hash:", user.password || "NOT SET");
         }
 
         if (!user) {
             throw new AppError("Invalid email or password", 401, ErrorCodes.AUTH_UNAUTHORIZED);
         }
 
-        // Check if user is active
         if (user.status !== "ACTIVE") {
             throw new AppError("Account is not active", 403, ErrorCodes.USER_SUSPENDED);
         }
 
-        // Verify password
         if (!user.password) {
-            console.log("❌ Password field is empty or null");
             throw new AppError("Password not set. Please use OTP login.", 400, ErrorCodes.AUTH_UNAUTHORIZED);
         }
 
-        console.log("🔐 Comparing password...");
         const isPasswordValid = await bcrypt.compare(password, user.password);
         console.log("   Password match:", isPasswordValid ? "✅ Yes" : "❌ No");
 
@@ -46,21 +38,23 @@ export class AdminAuthService {
             throw new AppError("Invalid email or password", 401, ErrorCodes.AUTH_UNAUTHORIZED);
         }
 
-        // Update last login
         user.lastLoginAt = new Date();
         await user.save();
 
-        // Generate tokens
+        // Generate tokens with proper secret from config
+        const accessSecret = config.jwt.accessSecret || process.env.JWT_ACCESS_SECRET || "your-secret-key";
+        const refreshSecret = config.jwt.refreshSecret || process.env.JWT_REFRESH_SECRET || "your-refresh-secret";
+
         const accessToken = jwt.sign(
             { id: user._id, email: user.email, role: user.role },
-            config.jwt.accessSecret,
-            { expiresIn: config.jwt.accessExpiresIn }
+            accessSecret,
+            { expiresIn: config.jwt.accessExpiresIn || "15m" }
         );
 
         const refreshToken = jwt.sign(
             { id: user._id, email: user.email },
-            config.jwt.refreshSecret,
-            { expiresIn: config.jwt.refreshExpiresIn }
+            refreshSecret,
+            { expiresIn: config.jwt.refreshExpiresIn || "30d" }
         );
 
         return {

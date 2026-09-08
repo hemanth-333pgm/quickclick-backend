@@ -3,7 +3,6 @@ import jwt from "jsonwebtoken";
 import { User } from "../../users/models/user.model";
 import { AppError } from "../../../common/errors/app-error";
 import { ErrorCodes } from "../../../common/constants/error-codes.constants";
-import { config } from "../../../config/env";
 
 export class AdminAuthService {
     async loginWithPassword(email: string, password: string): Promise<any> {
@@ -41,20 +40,35 @@ export class AdminAuthService {
         user.lastLoginAt = new Date();
         await user.save();
 
-        // Generate tokens with proper secret from config
-        const accessSecret = config.jwt.accessSecret || process.env.JWT_ACCESS_SECRET || "your-secret-key";
-        const refreshSecret = config.jwt.refreshSecret || process.env.JWT_REFRESH_SECRET || "your-refresh-secret";
+        // Get secrets from environment
+        const accessSecret = process.env.JWT_ACCESS_SECRET || "your-super-secret-access-key-min-32-characters";
+        const refreshSecret = process.env.JWT_REFRESH_SECRET || "your-super-secret-refresh-key-min-32-characters";
+        const accessExpiresIn = process.env.JWT_ACCESS_EXPIRES_IN || "15m";
+        const refreshExpiresIn = process.env.JWT_REFRESH_EXPIRES_IN || "30d";
 
+        // Generate access token with proper type casting
         const accessToken = jwt.sign(
-            { id: user._id, email: user.email, role: user.role },
+            { 
+                id: user._id.toString(), 
+                email: user.email, 
+                role: user.role 
+            } as object,
             accessSecret,
-            { expiresIn: config.jwt.accessExpiresIn || "15m" }
+            { 
+                expiresIn: accessExpiresIn as string | number 
+            } as jwt.SignOptions
         );
 
+        // Generate refresh token with proper type casting
         const refreshToken = jwt.sign(
-            { id: user._id, email: user.email },
+            { 
+                id: user._id.toString(), 
+                email: user.email 
+            } as object,
             refreshSecret,
-            { expiresIn: config.jwt.refreshExpiresIn || "30d" }
+            { 
+                expiresIn: refreshExpiresIn as string | number 
+            } as jwt.SignOptions
         );
 
         return {

@@ -1,9 +1,12 @@
 ﻿import { Request, Response, NextFunction } from "express";
 import { AdminDashboardService } from "../services/admin-dashboard.service";
+import { User } from "../../users/models/user.model";
+import { Retailer } from "../../retailers/models/retailer.model";
+import { DeliveryPartner } from "../../delivery/models/delivery-partner.model";
+import { Order } from "../../orders/models/order.model";
 import { SuccessResponse } from "../../../common/response/success-response";
 import { AppError } from "../../../common/errors/app-error";
 import { ErrorCodes } from "../../../common/constants/error-codes.constants";
-import { logger } from "../../../config/logger";
 
 export class AdminController {
     private dashboardService: AdminDashboardService;
@@ -11,6 +14,10 @@ export class AdminController {
     constructor() {
         this.dashboardService = new AdminDashboardService();
     }
+
+    // ============================================
+    // DASHBOARD
+    // ============================================
 
     getDashboardMetrics = async (req: Request, res: Response, next: NextFunction) => {
         try {
@@ -30,39 +37,13 @@ export class AdminController {
         }
     };
 
-    getActivityLogs = async (req: Request, res: Response, next: NextFunction) => {
-        try {
-            const filters = {
-                userId: req.query.userId as string,
-                module: req.query.module as string,
-                action: req.query.action as string,
-                status: req.query.status as string,
-                startDate: req.query.startDate ? new Date(req.query.startDate as string) : undefined,
-                endDate: req.query.endDate ? new Date(req.query.endDate as string) : undefined,
-                page: req.query.page ? parseInt(req.query.page as string) : 1,
-                limit: req.query.limit ? parseInt(req.query.limit as string) : 50,
-            };
-
-            const data = await this.dashboardService.getActivityLogs(filters);
-            res.json(SuccessResponse.success("Activity logs retrieved", data));
-        } catch (error) {
-            next(error);
-        }
-    };
-
     getChartData = async (req: Request, res: Response, next: NextFunction) => {
         try {
             const { type, period } = req.params;
-
-            if (!type || !period) {
-                throw new AppError("Type and period are required", 400, ErrorCodes.VALIDATION_ERROR);
-            }
-
             const data = await this.dashboardService.getChartData(
                 type as "orders" | "revenue" | "users" | "retailers",
                 period as "day" | "week" | "month" | "year"
             );
-
             res.json(SuccessResponse.success("Chart data retrieved", data));
         } catch (error) {
             next(error);
@@ -80,12 +61,59 @@ export class AdminController {
         }
     };
 
-    // User Management
+    // ============================================
+    // USERS
+    // ============================================
+
     getUsers = async (req: Request, res: Response, next: NextFunction) => {
         try {
             const { role, status, search, page = 1, limit = 20 } = req.query;
-            // Implement user listing with filters
-            res.json(SuccessResponse.success("Users retrieved", { users: [] }));
+            
+            const query: any = {};
+            if (role) query.role = role;
+            if (status) query.status = status;
+            if (search) {
+                query.$or = [
+                    { name: { $regex: search, $options: "i" } },
+                    { mobile: { $regex: search, $options: "i" } },
+                    { email: { $regex: search, $options: "i" } }
+                ];
+            }
+            
+            const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
+            
+            const [users, total] = await Promise.all([
+                User.find(query)
+                    .sort({ createdAt: -1 })
+                    .skip(skip)
+                    .limit(parseInt(limit as string)),
+                User.countDocuments(query)
+            ]);
+            
+            res.json(SuccessResponse.success("Users retrieved", {
+                users,
+                pagination: {
+                    page: parseInt(page as string),
+                    limit: parseInt(limit as string),
+                    total,
+                    totalPages: Math.ceil(total / parseInt(limit as string))
+                }
+            }));
+        } catch (error) {
+            next(error);
+        }
+    };
+
+    getUserDetails = async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            const { id } = req.params;
+            const user = await User.findById(id);
+            
+            if (!user) {
+                throw new AppError("User not found", 404, ErrorCodes.USER_NOT_FOUND);
+            }
+            
+            res.json(SuccessResponse.success("User details retrieved", user));
         } catch (error) {
             next(error);
         }
@@ -94,99 +122,257 @@ export class AdminController {
     updateUserStatus = async (req: Request, res: Response, next: NextFunction) => {
         try {
             const { id } = req.params;
-            const { status } = req.body;
-
-            // Log activity
-            await this.dashboardService.logActivity({
-                userId: req.userId!,
-                userName: req.user?.name || "Admin",
-                userRole: req.userRole!,
-                action: "UPDATE_USER_STATUS",
-                module: "USERS",
-                entityId: id,
-                entityType: "User",
-                changes: { status },
-                ipAddress: req.ip || req.connection.remoteAddress || "unknown",
-                userAgent: req.headers["user-agent"] || "unknown",
-            });
-
-            res.json(SuccessResponse.success("User status updated", { userId: id, status }));
+            const { status, reason } = req.body;
+            
+            const user = await User.findByIdAndUpdate(
+                id,
+                { status },
+                { new: true }
+            );
+            
+            if (!user) {
+                throw new AppError("User not found", 404, ErrorCodes.USER_NOT_FOUND);
+            }
+            
+            res.json(SuccessResponse.success("User status updated", user));
         } catch (error) {
             next(error);
         }
     };
 
-    // Retailer Management
+    // ============================================
+    // RETAILERS
+    // ============================================
+
+    getRetailers = async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            const { status, search, page = 1, limit = 20 } = req.query;
+            
+            const query: any = {};
+            if (status) query.status = status;
+            if (search) {
+                query.$or = [
+                    { shopName: { $regex: search, $options: "i" } },
+                    { phone: { $regex: search, $options: "i" } }
+                ];
+            }
+            
+            const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
+            
+            const [retailers, total] = await Promise.all([
+                Retailer.find(query)
+                    .populate("ownerId", "name mobile")
+                    .sort({ createdAt: -1 })
+                    .skip(skip)
+                    .limit(parseInt(limit as string)),
+                Retailer.countDocuments(query)
+            ]);
+            
+            res.json(SuccessResponse.success("Retailers retrieved", {
+                retailers,
+                pagination: {
+                    page: parseInt(page as string),
+                    limit: parseInt(limit as string),
+                    total,
+                    totalPages: Math.ceil(total / parseInt(limit as string))
+                }
+            }));
+        } catch (error) {
+            next(error);
+        }
+    };
+
+    getRetailerDetails = async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            const { id } = req.params;
+            const retailer = await Retailer.findById(id)
+                .populate("ownerId", "name mobile");
+            
+            if (!retailer) {
+                throw new AppError("Retailer not found", 404, ErrorCodes.RETAILER_NOT_FOUND);
+            }
+            
+            res.json(SuccessResponse.success("Retailer details retrieved", retailer));
+        } catch (error) {
+            next(error);
+        }
+    };
+
     approveRetailer = async (req: Request, res: Response, next: NextFunction) => {
         try {
             const { id } = req.params;
-            const { status } = req.body;
-
-            // Log activity
-            await this.dashboardService.logActivity({
-                userId: req.userId!,
-                userName: req.user?.name || "Admin",
-                userRole: req.userRole!,
-                action: "APPROVE_RETAILER",
-                module: "RETAILERS",
-                entityId: id,
-                entityType: "Retailer",
-                changes: { status },
-                ipAddress: req.ip || req.connection.remoteAddress || "unknown",
-                userAgent: req.headers["user-agent"] || "unknown",
-            });
-
-            res.json(SuccessResponse.success("Retailer status updated", { retailerId: id, status }));
+            const { status, remarks } = req.body;
+            
+            const retailer = await Retailer.findByIdAndUpdate(
+                id,
+                { status },
+                { new: true }
+            );
+            
+            if (!retailer) {
+                throw new AppError("Retailer not found", 404, ErrorCodes.RETAILER_NOT_FOUND);
+            }
+            
+            res.json(SuccessResponse.success("Retailer status updated", retailer));
         } catch (error) {
             next(error);
         }
     };
 
-    // Delivery Partner Management
-    approveDeliveryPartner = async (req: Request, res: Response, next: NextFunction) => {
+    // ============================================
+    // DELIVERY PARTNERS
+    // ============================================
+
+    getDeliveryPartners = async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            const { status, availability, page = 1, limit = 20 } = req.query;
+            
+            const query: any = {};
+            if (status) query.status = status;
+            if (availability) query.availability = availability;
+            
+            const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
+            
+            const [partners, total] = await Promise.all([
+                DeliveryPartner.find(query)
+                    .populate("userId", "name mobile")
+                    .sort({ createdAt: -1 })
+                    .skip(skip)
+                    .limit(parseInt(limit as string)),
+                DeliveryPartner.countDocuments(query)
+            ]);
+            
+            res.json(SuccessResponse.success("Delivery partners retrieved", {
+                partners,
+                pagination: {
+                    page: parseInt(page as string),
+                    limit: parseInt(limit as string),
+                    total,
+                    totalPages: Math.ceil(total / parseInt(limit as string))
+                }
+            }));
+        } catch (error) {
+            next(error);
+        }
+    };
+
+    updateDeliveryPartnerStatus = async (req: Request, res: Response, next: NextFunction) => {
         try {
             const { id } = req.params;
-            const { status } = req.body;
-
-            await this.dashboardService.logActivity({
-                userId: req.userId!,
-                userName: req.user?.name || "Admin",
-                userRole: req.userRole!,
-                action: "APPROVE_DELIVERY_PARTNER",
-                module: "DELIVERY",
-                entityId: id,
-                entityType: "DeliveryPartner",
-                changes: { status },
-                ipAddress: req.ip || req.connection.remoteAddress || "unknown",
-                userAgent: req.headers["user-agent"] || "unknown",
-            });
-
-            res.json(SuccessResponse.success("Delivery partner status updated", { partnerId: id, status }));
+            const { status, remarks } = req.body;
+            
+            const partner = await DeliveryPartner.findByIdAndUpdate(
+                id,
+                { status },
+                { new: true }
+            );
+            
+            if (!partner) {
+                throw new AppError("Delivery partner not found", 404, ErrorCodes.DELIVERY_PARTNER_NOT_FOUND);
+            }
+            
+            res.json(SuccessResponse.success("Delivery partner status updated", partner));
         } catch (error) {
             next(error);
         }
     };
 
-    // Order Management
+    // ============================================
+    // ORDERS
+    // ============================================
+
+    getOrders = async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            const { status, retailerId, deliveryPartnerId, dateFrom, dateTo, search, page = 1, limit = 20 } = req.query;
+            
+            const query: any = {};
+            if (status) query.status = status;
+            if (retailerId) query.retailerId = retailerId;
+            if (deliveryPartnerId) query.deliveryPartnerId = deliveryPartnerId;
+            if (search) {
+                query.orderNumber = { $regex: search, $options: "i" };
+            }
+            if (dateFrom || dateTo) {
+                query.createdAt = {};
+                if (dateFrom) query.createdAt.$gte = new Date(dateFrom as string);
+                if (dateTo) query.createdAt.$lte = new Date(dateTo as string);
+            }
+            
+            const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
+            
+            const [orders, total] = await Promise.all([
+                Order.find(query)
+                    .populate("userId", "name mobile")
+                    .populate("retailerId", "shopName")
+                    .populate("deliveryPartnerId", "name mobile")
+                    .sort({ createdAt: -1 })
+                    .skip(skip)
+                    .limit(parseInt(limit as string)),
+                Order.countDocuments(query)
+            ]);
+            
+            const totalRevenue = orders.reduce((sum, o) => sum + o.total, 0);
+            
+            res.json(SuccessResponse.success("Orders retrieved", {
+                orders,
+                pagination: {
+                    page: parseInt(page as string),
+                    limit: parseInt(limit as string),
+                    total,
+                    totalPages: Math.ceil(total / parseInt(limit as string))
+                },
+                summary: {
+                    totalRevenue,
+                    totalOrders: total,
+                    avgOrderValue: total > 0 ? totalRevenue / total : 0
+                }
+            }));
+        } catch (error) {
+            next(error);
+        }
+    };
+
+    getOrderDetails = async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            const { id } = req.params;
+            const order = await Order.findById(id)
+                .populate("userId", "name mobile email")
+                .populate("retailerId", "shopName phone address")
+                .populate("deliveryPartnerId", "name mobile vehicleType");
+            
+            if (!order) {
+                throw new AppError("Order not found", 404, ErrorCodes.ORDER_NOT_FOUND);
+            }
+            
+            res.json(SuccessResponse.success("Order details retrieved", order));
+        } catch (error) {
+            next(error);
+        }
+    };
+
     assignDelivery = async (req: Request, res: Response, next: NextFunction) => {
         try {
             const { id } = req.params;
             const { deliveryPartnerId } = req.body;
-
-            await this.dashboardService.logActivity({
-                userId: req.userId!,
-                userName: req.user?.name || "Admin",
-                userRole: req.userRole!,
-                action: "ASSIGN_DELIVERY",
-                module: "ORDERS",
-                entityId: id,
-                entityType: "Order",
-                changes: { deliveryPartnerId },
-                ipAddress: req.ip || req.connection.remoteAddress || "unknown",
-                userAgent: req.headers["user-agent"] || "unknown",
+            
+            const order = await Order.findById(id);
+            if (!order) {
+                throw new AppError("Order not found", 404, ErrorCodes.ORDER_NOT_FOUND);
+            }
+            
+            order.deliveryPartnerId = deliveryPartnerId;
+            order.status = "ASSIGNED";
+            order.statusHistory.push({
+                fromStatus: "READY_FOR_PICKUP",
+                toStatus: "ASSIGNED",
+                actorId: req.userId,
+                actorRole: "ADMIN",
+                reason: `Assigned to delivery partner ${deliveryPartnerId}`,
+                timestamp: new Date()
             });
-
-            res.json(SuccessResponse.success("Delivery assigned", { orderId: id, deliveryPartnerId }));
+            await order.save();
+            
+            res.json(SuccessResponse.success("Delivery assigned", order));
         } catch (error) {
             next(error);
         }

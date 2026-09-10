@@ -1,5 +1,6 @@
 ﻿import express, { Application } from "express";
 import mongoose from "mongoose";
+import { ensureGeoIndexes } from "./config/database-indexes";
 import dotenv from "dotenv";
 import cors from "cors";
 import helmet from "helmet";
@@ -22,6 +23,18 @@ import locationRoutes from "./modules/location/routes/location.routes";
 import zoneRoutes from "./modules/zones/routes/zone.routes";
 import notificationRoutes from "./modules/notifications/routes";
 import verificationRoutes from "./modules/verification/routes/verification.routes";
+import addressRoutes from "./modules/addresses/routes";
+import cartRoutes from "./modules/cart/routes";
+import categoryRoutes from "./modules/categories/routes";
+import couponRoutes from "./modules/coupons/routes";
+import kycRoutes from "./modules/kyc/routes";
+import mapRoutes from "./modules/map/routes/map.routes";
+import paymentRoutes from "./modules/payments/routes";
+import ratingRoutes from "./modules/ratings/routes";
+import reportRoutes from "./modules/reports/routes";
+import walletRoutes from "./modules/wallet/routes";
+import wishlistRoutes from "./modules/wishlist/routes";
+import customerRoutes from "./modules/customer/routes";
 
 // Import middleware
 import { errorHandler } from "./middleware/error.middleware";
@@ -65,6 +78,19 @@ app.use(`${API_PREFIX}/location`, locationRoutes);
 app.use(`${API_PREFIX}/zones`, zoneRoutes);
 app.use(`${API_PREFIX}/notifications`, notificationRoutes);
 app.use(`${API_PREFIX}/verification`, verificationRoutes);
+app.use(`${API_PREFIX}/retailer`, retailerRoutes);
+app.use(`${API_PREFIX}/addresses`, addressRoutes);
+app.use(`${API_PREFIX}/cart`, cartRoutes);
+app.use(`${API_PREFIX}/categories`, categoryRoutes);
+app.use(`${API_PREFIX}/coupons`, couponRoutes);
+app.use(`${API_PREFIX}/kyc`, kycRoutes);
+app.use(`${API_PREFIX}/map`, mapRoutes);
+app.use(`${API_PREFIX}/payments`, paymentRoutes);
+app.use(`${API_PREFIX}/ratings`, ratingRoutes);
+app.use(`${API_PREFIX}/reports`, reportRoutes);
+app.use(`${API_PREFIX}/wallet`, walletRoutes);
+app.use(`${API_PREFIX}/wishlist`, wishlistRoutes);
+app.use(`${API_PREFIX}/customer`, customerRoutes);
 
 // 404 Handler
 app.use((req, res) => {
@@ -84,6 +110,7 @@ app.use(errorHandler);
 const startServer = async () => {
     try {
         await mongoose.connect(MONGODB_URI);
+        await ensureGeoIndexes();
         console.log("✅ MongoDB connected successfully");
         console.log(`📊 Database: ${mongoose.connection.name}`);
         console.log(`📍 Host: ${mongoose.connection.host}`);
@@ -135,3 +162,6 @@ process.on("SIGTERM", async () => {
     console.log("✅ MongoDB disconnected");
     process.exit(0);
 });
+
+
+

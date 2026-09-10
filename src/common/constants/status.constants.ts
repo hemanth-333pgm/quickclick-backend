@@ -63,7 +63,8 @@ export const UserRoles = {
     RETAILER: "RETAILER",
     DELIVERY: "DELIVERY",
     ADMIN: "ADMIN",
-    SUPER_ADMIN: "SUPER_ADMIN"
+    SUPER_ADMIN: "SUPER_ADMIN",
+    DELIVERY_PARTNER: "DELIVERY_PARTNER",
 } as const;
 
 export type UserStatusType = typeof UserStatus[keyof typeof UserStatus];
@@ -73,3 +74,5 @@ export type OrderStatusType = typeof OrderStatus[keyof typeof OrderStatus];
 export type PaymentStatusType = typeof PaymentStatus[keyof typeof PaymentStatus];
 export type DeliveryAssignmentStatusType = typeof DeliveryAssignmentStatus[keyof typeof DeliveryAssignmentStatus];
 export type UserRolesType = typeof UserRoles[keyof typeof UserRoles];
+
+

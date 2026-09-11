@@ -7,7 +7,6 @@ import { logger } from "../../../config/logger";
 import { AppError } from "../../../common/errors/app-error";
 import { ErrorCodes } from "../../../common/constants/error-codes.constants";
 import * as bcrypt from "bcryptjs";
-import { sendOtpEmail } from "../../../config/email";
 
 export class AuthService {
     private authRepository: AuthRepository;
@@ -18,11 +17,7 @@ export class AuthService {
         this.tokenService = new TokenService();
     }
 
-    async sendOTP(
-        mobile: string,
-        purpose: string = "LOGIN",
-        email?: string
-    ): Promise<{ challengeId: string; devOtp?: string }> {
+    async sendOTP(mobile: string, purpose: string = "LOGIN"): Promise<{ challengeId: string }> {
         const otp = this.generateOTP();
         const otpHash = await bcrypt.hash(otp, 10);
         const expiresAt = new Date();
@@ -38,36 +33,8 @@ export class AuthService {
             attempts: 0,
         });
 
-        // ── Resolve recipient email ─────────────────────────
-        let emailTo = email;
-        if (!emailTo) {
-            const user = await User.findOne({ mobile });
-            emailTo = user?.email;
-        }
-        if (!emailTo) {
-            emailTo = process.env.DEV_OTP_EMAIL;
-        }
-
-        // ── Send via Gmail ──────────────────────────────────
-        if (emailTo) {
-            try {
-                await sendOtpEmail(emailTo, otp, Math.round(config.otp.ttlSeconds / 60));
-                logger.info(`📧 OTP emailed to ${emailTo} (mobile ${mobile})`);
-            } catch (e: any) {
-                logger.error(`❌ Failed to email OTP to ${emailTo}: ${e?.message || e}`);
-                logger.info(`📱 Fallback — OTP for ${mobile}: ${otp}`);
-            }
-        } else {
-            logger.warn(`⚠️ No email for ${mobile} — OTP only logged below`);
-            logger.info(`📱 OTP for ${mobile}: ${otp}`);
-        }
-
-        // ── Return challengeId (+ devOtp in non-prod) ───────
-        const response: { challengeId: string; devOtp?: string } = {
-            challengeId: otpRecord._id.toString(),
-        };
-        response.devOtp = otp;
-        return response;
+        logger.info(`📱 OTP for ${mobile}: ${otp}`);
+        return { challengeId: otpRecord._id.toString() };
     }
 
     async verifyOTP(
@@ -173,5 +140,3 @@ export class AuthService {
         return otp;
     }
 }
-
-

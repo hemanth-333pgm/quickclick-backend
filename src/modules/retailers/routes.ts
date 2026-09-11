@@ -194,3 +194,35 @@ router.patch("/orders/:id/status", authMiddleware, async (req: any, res: any, ne
     });
   } catch (e) { next(e); }
 });
+
+// ── PUT /retailers/me — update store details ───────────────
+router.put("/me", authMiddleware, async (req: any, res, next) => {
+  try {
+    const updates: any = {};
+    ["shopName", "phone", "email", "address", "location", "serviceRadiusKm", "categories"].forEach(k => {
+      if (req.body[k] !== undefined) updates[k] = req.body[k];
+    });
+
+    if (!Object.keys(updates).length) {
+      return res.status(400).json({
+        success: false,
+        error: { code: "VALIDATION_ERROR", message: "No updatable fields provided" },
+      });
+    }
+
+    const retailer = await Retailer.findOneAndUpdate(
+      { ownerId: req.user._id },
+      { $set: updates },
+      { new: true, runValidators: true }
+    );
+
+    if (!retailer) {
+      return res.status(404).json({
+        success: false,
+        error: { code: "RESOURCE_NOT_FOUND", message: "Retailer not found" },
+      });
+    }
+
+    res.json({ success: true, data: retailer });
+  } catch (e) { next(e); }
+});

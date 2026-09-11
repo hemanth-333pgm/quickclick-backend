@@ -159,5 +159,34 @@ router.post("/jobs/:id/reject", async (req: any, res, next) => {
 
 export default router;
 
+// ── PUT /delivery/me — update partner details ──────────────
+router.put("/me", authMiddleware, async (req: any, res, next) => {
+  try {
+    const updates: any = {};
+    ["vehicleType", "vehicleNumber", "vehicleModel", "licenseNumber"].forEach(k => {
+      if (req.body[k] !== undefined) updates[k] = req.body[k];
+    });
 
+    if (!Object.keys(updates).length) {
+      return res.status(400).json({
+        success: false,
+        error: { code: "VALIDATION_ERROR", message: "No updatable fields provided" },
+      });
+    }
 
+    const partner = await DeliveryPartner.findOneAndUpdate(
+      { userId: req.user._id },
+      { $set: updates },
+      { new: true, runValidators: true }
+    );
+
+    if (!partner) {
+      return res.status(404).json({
+        success: false,
+        error: { code: "RESOURCE_NOT_FOUND", message: "Partner not found" },
+      });
+    }
+
+    res.json({ success: true, data: partner });
+  } catch (e) { next(e); }
+});

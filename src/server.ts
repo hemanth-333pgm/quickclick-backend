@@ -1,4 +1,8 @@
-﻿import express, { Application } from "express";
+﻿// Windows + Node fix: c-ares can't resolve MongoDB SRV records reliably.
+// Force DNS through public resolvers before any network connection.
+import dns from "dns";
+dns.setServers(["8.8.8.8", "8.8.4.4", "1.1.1.1"]);
+import express, { Application } from "express";
 import mongoose from "mongoose";
 import { ensureGeoIndexes } from "./config/database-indexes";
 import dotenv from "dotenv";
@@ -162,6 +166,7 @@ process.on("SIGTERM", async () => {
     console.log("✅ MongoDB disconnected");
     process.exit(0);
 });
+
 
 
 

@@ -1,4 +1,6 @@
-﻿// scripts/seed-database.ts
+﻿import dns from "dns";
+dns.setServers(["8.8.8.8", "8.8.4.4", "1.1.1.1"]);
+// scripts/seed-database.ts
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 
@@ -653,3 +655,4 @@ const seedDatabase = async () => {
 };
 
 seedDatabase();
+

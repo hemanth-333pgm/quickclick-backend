@@ -8,3 +8,7 @@ build/
 *.log
 coverage/
 .nyc_output/
+
+*.bak
+*.bak-*
+.env.bak

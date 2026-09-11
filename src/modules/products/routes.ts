@@ -9,12 +9,9 @@ const router = Router();
 // ── Helper: allow RETAILER or ADMIN or SUPER_ADMIN ─────────
 // rbacMiddleware takes a single role string, so we dispatch manually.
 const requireRetailerOrAdmin = (req: any, res: any, next: any) => {
-  const role = req.user?.role;
-  if (role === Roles.RETAILER) {
-    return rbacMiddleware(Roles.RETAILER)(req, res, next);
-  }
-  if (role === Roles.ADMIN || role === Roles.SUPER_ADMIN) {
-    return rbacMiddleware(Roles.ADMIN)(req, res, next);
+  const role = req.user?.role || req.userRole || req.userData?.role;
+  if (role === "RETAILER" || role === "ADMIN" || role === "SUPER_ADMIN") {
+    return next();
   }
   return res.status(403).json({
     success: false,
@@ -173,3 +170,6 @@ router.put("/:id/status", authMiddleware, rbacMiddleware(Roles.ADMIN), async (re
 });
 
 export default router;
+
+
+

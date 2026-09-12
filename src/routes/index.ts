@@ -31,6 +31,7 @@ router.use("/auth", authRoutes);
 router.use("/products", productRoutes);
 router.use("/categories", categoryRoutes);
 router.use("/retailers", retailerRoutes);
+router.use('/retailer', retailerRoutes);  // singular alias
 router.use("/location", locationRoutes);
 router.use("/zones", zoneRoutes);
 router.use("/coupons", couponRoutes);

@@ -41,6 +41,31 @@ export const errorHandler = (
     }
 
     // Default error
+    // ── Mongoose DocumentNotFoundError ────────────────────────
+    if (err.name === "DocumentNotFoundError") {
+        return res.status(404).json({
+            success: false,
+            error: {
+                code: "NOT_FOUND",
+                message: "Resource not found",
+                timestamp: new Date().toISOString(),
+            },
+        });
+    }
+
+    // ── Mongoose CastError (bad ObjectId) ─────────────────────
+    if (err.name === "CastError") {
+        return res.status(400).json({
+            success: false,
+            error: {
+                code: "VALIDATION_ERROR",
+                message: `Invalid ${(err as any).path}: ${(err as any).value}`,
+                timestamp: new Date().toISOString(),
+            },
+        });
+    }
+
+    // ── Default ──────────────────────────────────────────────
     res.status(500).json({
         success: false,
         error: {
@@ -52,3 +77,4 @@ export const errorHandler = (
         }
     });
 };
+

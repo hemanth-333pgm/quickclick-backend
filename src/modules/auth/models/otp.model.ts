@@ -2,6 +2,7 @@
 
 export interface IOTP extends Document {
     mobile: string;
+    name?: string;
     purpose: string;
     otpHash: string;
     expiresAt: Date;
@@ -23,6 +24,7 @@ const OTPSchema = new Schema<IOTP>(
             enum: ["LOGIN", "REGISTER", "FORGOT_PASSWORD"],
             default: "LOGIN",
         },
+        name: { type: String, trim: true },
         otpHash: {
             type: String,
             required: true,
@@ -48,3 +50,5 @@ const OTPSchema = new Schema<IOTP>(
 );
 
 export const OTP = mongoose.model<IOTP>("OTP", OTPSchema);
+
+

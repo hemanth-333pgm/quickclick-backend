@@ -12,3 +12,22 @@ coverage/
 *.bak
 *.bak-*
 .env.bak
+
+# Backups from fix scripts
+*.bak.*
+*.bak-*
+
+# Diagnostic dumps
+conventions-dump.txt
+ts-source-dump.txt
+dist-tree.txt
+fix-source-dump.txt
+
+# Env files
+.env
+.env.*
+!.env.example
+
+# Build output (already should be)
+dist/
+node_modules/

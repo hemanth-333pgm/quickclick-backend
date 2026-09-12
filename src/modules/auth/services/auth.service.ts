@@ -18,11 +18,7 @@ export class AuthService {
         this.tokenService = new TokenService();
     }
 
-    async sendOTP(
-        mobile: string,
-        purpose: string = "LOGIN",
-        email?: string
-    ): Promise<{ challengeId: string; devOtp?: string }> {
+    async sendOTP(mobile: string, purpose: string = "LOGIN", email?: string, name?: string): Promise<{ challengeId: string; devOtp?: string }> {
         const otp = this.generateOTP();
         const otpHash = await bcrypt.hash(otp, 10);
         const expiresAt = new Date();
@@ -31,6 +27,7 @@ export class AuthService {
         await OTP.deleteMany({ mobile, purpose, verifiedAt: { $exists: false } });
 
         const otpRecord = await OTP.create({
+            name: name || undefined,
             mobile,
             purpose,
             otpHash,
@@ -111,7 +108,7 @@ export class AuthService {
         let user = await User.findOne({ mobile });
         if (!user) {
             user = await User.create({
-                name: `Customer ${mobile.slice(-4)}`,
+                name: (otpRecord as any).name || `Customer ${mobile.slice(-4)}`,
                 mobile,
                 role: "CUSTOMER",
                 status: "ACTIVE",
@@ -173,5 +170,7 @@ export class AuthService {
         return otp;
     }
 }
+
+
 
 

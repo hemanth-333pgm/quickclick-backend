@@ -18,13 +18,13 @@ export class AuthController {
 
     sendOTP = async (req: Request, res: Response, next: NextFunction) => {
         try {
-            const { mobile, purpose = "LOGIN" } = req.body;
+            const { mobile, purpose = "LOGIN", email, name } = req.body;
             
             if (!mobile) {
                 throw new AppError("Mobile number is required", 400, ErrorCodes.VALIDATION_ERROR);
             }
 
-            const result = await this.authService.sendOTP(mobile, purpose);
+            const result = await this.authService.sendOTP(mobile, purpose, email, name);
             res.status(200).json(SuccessResponse.success("OTP sent successfully", result));
         } catch (error) {
             next(error);
@@ -127,3 +127,4 @@ export class AuthController {
         }
     };
 }
+

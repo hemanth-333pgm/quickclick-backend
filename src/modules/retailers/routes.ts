@@ -1,4 +1,5 @@
-﻿import { Router } from "express";
+﻿import { User } from "../users/models/user.model";
+import { Router } from "express";
 import { authMiddleware } from "../../middleware/auth.middleware";
 import { rbacMiddleware, Roles } from "../../middleware/rbac.middleware";
 import { Retailer } from "./models/retailer.model";
@@ -105,7 +106,18 @@ router.post("/register", authMiddleware, async (req: any, res, next) => {
   try {
     const existing = await Retailer.findOne({ ownerId: req.user?._id });
     if (existing) return res.status(409).json({ success: false, error: { code: "VALIDATION_ERROR", message: "Retailer already registered" } });
-    const retailer = await Retailer.create({ ...req.body, ownerId: req.user?._id, status: "PENDING" });
+    const retailer = await Retailer.create({
+      ...req.body,
+      phone: req.body.phone || req.user.mobile,
+      email: req.body.email || req.user.email,
+      ownerId: req.user._id,
+      status: "PENDING",
+      isOpen: false,
+      documents: (req.body.documents || [])
+        .filter((d: any) => d && d.url && String(d.url).trim())
+        .map((d: any) => ({ url: String(d.url).trim(), type: d.type || "OTHER", status: "PENDING", uploadedAt: new Date() })),
+    });
+    await User.updateOne({ _id: req.user._id }, { $set: { role: "RETAILER" } });
     res.status(201).json({ success: true, data: retailer });
   } catch (e) { next(e); }
 });
@@ -226,4 +238,6 @@ router.put("/me", authMiddleware, async (req: any, res, next) => {
 });
 
 export default router;
+
+
 

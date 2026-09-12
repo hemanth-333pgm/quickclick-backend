@@ -119,8 +119,6 @@ router.get("/:id", async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-export default router;
-
 // ── PATCH /retailers/orders/:id/status ─────────────────────
 // Retailer accepts, rejects, prepares, or marks ready.
 // On READY_FOR_PICKUP, auto-assign runs.
@@ -226,3 +224,6 @@ router.put("/me", authMiddleware, async (req: any, res, next) => {
     res.json({ success: true, data: retailer });
   } catch (e) { next(e); }
 });
+
+export default router;
+
